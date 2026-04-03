@@ -192,7 +192,7 @@ class Minimizing1d:
         old_x = None
         count = 0
 
-        xx = np.linspace(0, 5, 100)
+        xx = np.linspace(1e-4, 5, 100)
         func_vals = func(xx)
         if viz:
             os.makedirs("MinimizationPlotting", exist_ok=True)
@@ -1237,13 +1237,6 @@ def get_plot_profile(x_values: np.ndarray, params: dict) -> np.ndarray:
     return N(x_values, A, params["Nsat"], params["a"], params["b"], params["c"])
 
 
-def is_valid_profile_params(params: dict) -> bool:
-    a = params["a"]
-    b = params["b"]
-    c = params["c"]
-    return 0.5 <= a <= 10.0 and 1e-3 <= b <= X_MAX and 0.1 <= c <= 10.0
-
-
 #### Fitting ####
 
 
@@ -1265,12 +1258,10 @@ def chi2(model: callable, data: np.ndarray, params: dict) -> float:
     float
         The chi-squared value for the given parameters and data.
     """
-    if not is_valid_profile_params(params):
-        return np.inf
-
     expected = model(data["bin_edges"], params)
     observed = data["counts"]
 
+    # Incase something explodes
     if np.any(~np.isfinite(expected)) or np.any(expected <= 0):
         return np.inf
 
@@ -1304,12 +1295,10 @@ def negative_poisson_ln_likelihood(
     float
         The Poisson negative log-likelihood value for the given parameters and data.
     """
-    if not is_valid_profile_params(params):
-        return np.inf
-
     expected = model(data["bin_edges"], params)
     observed = data["counts"]
 
+    # Incase something explodes
     if np.any(~np.isfinite(expected)) or np.any(expected <= 0):
         return np.inf
 
