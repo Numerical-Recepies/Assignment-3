@@ -649,6 +649,48 @@ class LikelihoodMinimizer:
             print(f"Step size: {step_size}")
             print("-----------------------------")
         return history
+    
+
+def romberg_integrator(
+    func: callable, bounds: tuple, order: int = 5, err: bool = False, args: tuple = ()
+) -> float | tuple[float, float]:
+    a, b = bounds
+
+    def _ni(i):
+        return 2**i
+
+    def _get_new_points(hi, ni):
+        return func(a + hi * (np.arange(1, ni, 2)), *args)
+
+    def _error_estimate(result, old_result):
+        # error ~ |result - old_result|
+        return np.abs(result - old_result)
+
+    # Romberg table - forgot this in the last assignment, oops
+    R = np.zeros((order + 1, order + 1), dtype=float)
+
+    # Initial trapezoidal estimate
+    h0 = b - a
+    R[0, 0] = 0.5 * h0 * (func(a, *args) + func(b, *args))
+    hi = h0
+    for i in range(1, order + 1):
+        ni = _ni(i)
+        hi = hi / 2
+        new_y = _get_new_points(hi, ni)
+        old_result = R[i - 1, 0]
+        R[i, 0] = 0.5 * (old_result + 2 * hi * np.sum(new_y))
+
+        # Richardson extrapolation
+        for j in range(1, i + 1):
+            R[i, j] = R[i, j - 1] + (R[i, j - 1] - R[i - 1, j - 1]) / (4**j - 1)
+
+    result = R[order, order]
+
+    if err:
+        error_est = _error_estimate(result, R[order - 1, order - 1])
+        return result, error_est
+
+    return result
 
 
 def finite_differences_gradient(likelihood_fn: callable, model: callable, data: np.ndarray, params: dict) -> float:
@@ -1143,13 +1185,11 @@ def my_minimizer(
     return x_min, func_min
 
 
-def integrate_midpoint(
-    func: callable, x_lower: float, x_upper: float, num_steps: int = 512
+def integrate_via_romberg(
+    func: callable, x_lower: float, x_upper: float
 ) -> float:
-    dx = (x_upper - x_lower) / num_steps
-    x_mid = x_lower + (np.arange(num_steps) + 0.5) * dx
-    return np.sum(func(x_mid)) * dx
-
+    """Use romberg integration to compute the integral of func from x_lower to x_upper."""
+    return romberg_integrator(func, (x_lower, x_upper), order=5)
 
 def build_binned_dataset(
     radius: np.ndarray,
@@ -1180,11 +1220,10 @@ def model_bin_means(bin_edges: np.ndarray, params: dict) -> np.ndarray:
     expected = []
     for x_left, x_right in zip(bin_edges[:-1], bin_edges[1:]):
         expected.append(
-            integrate_midpoint(
+            integrate_via_romberg(
                 lambda x: N(x, A, Nsat, a, b, c),
                 x_left,
-                x_right,
-                num_steps=256,
+                x_right
             )
         )
     return np.array(expected)
@@ -1307,13 +1346,13 @@ def get_normalization_constant(a: float, b: float, c: float, Nsat: float) -> flo
     if b <= 0 or c <= 0:
         return np.inf
 
-    integral = integrate_midpoint(
+    integral = integrate_via_romberg(
         lambda x: 4 * np.pi * x**2 * (x / b) ** (a - 3) * np.exp(-((x / b) ** c)),
         1e-6,
         X_MAX,
-        num_steps=4096,
     )
 
+    # Better safe then sorry
     if integral <= 0 or not np.isfinite(integral):
         return np.inf
     return 1 / integral
