@@ -1,0 +1,9 @@
+__pycache__
+*.png
+*.tex
+Data/
+*.aux
+*.log
+*.out
+Code/
+satellite_*
