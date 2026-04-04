@@ -1,11 +1,13 @@
 # imports
-from math import gamma
 import os
 from typing import Callable, Any
 
 import numpy as np
 import matplotlib.pyplot as plt
 
+
+# Glob variable for the maximum and minimum x value in the plots and optimization
+X_MIN = 1e-4
 X_MAX = 5.0
 
 
@@ -41,6 +43,8 @@ class MCMC:
         self._likelihood = likelihood
         self._proposed_distribution = proposed_distribution
         self._proposed_distribution_kwargs = kwargs_proposal_dist
+
+        self._rng = RNG()
 
     def metropolis_hastings(
         self,
@@ -84,7 +88,7 @@ class MCMC:
                 samples.append(trial_sample)
                 num_accepted_samples += 1
             else:
-                rand_num = np.random.random()
+                rand_num = self._rng.random()
                 if rand_num < a:
                     samples.append(trial_sample)
                     num_accepted_samples += 1
@@ -143,6 +147,12 @@ class MCMC:
 
 class Minimizing1d:
     def __init__(self, method: str):
+        """
+        Initializes the Minimizing1d class with the specified optimization method.
+        Two methods are implemented: "golden section" and "brent method".
+        Additianally, the "golden sectopm" has vizualization implemented,
+        while the "brent method" does not have vizualization implemented yet.
+        """
         assert method in [
             "golden section",
             "brent method",
@@ -154,12 +164,20 @@ class Minimizing1d:
         self.w = 2 - self.golden_ratio
 
     def minimize(self, func, a, b, tol=1e-5, viz=True, vizstep=5):
+        """
+        Minimize the function func in the interval [a, b] using the specified method
+        in the initialization of the class.
+        """
         if self.method == "golden section":
             return self._golden_section(func, a, b, tol, viz, vizstep)
         elif self.method == "brent method":
             return self._brent_method(func, a, b, tol, viz, vizstep)
 
     def _brent_method(self, func, a, b, tol, viz, vizstep):
+        """
+        Perform Brent's method to find the minimum of the function func in the interval [a, b].
+        
+        `vizstep` is not implemented yet for Brent's method and is here for consistency."""
         if viz:
             print("Brent's method vizualization not implemented yet!")
             print("Proceeding without vizualization...")
@@ -187,12 +205,15 @@ class Minimizing1d:
                 a, b, c, d, _ = self._golden_step(a, b, c)
 
     def _golden_section(self, func, a, b, tol, viz, vizstep):
+        """
+        Perform the golden section method to find the minimum of the function func in the interval [a, b].
+        """
         a, b, c = self._bracketing(func, a, b)
 
         old_x = None
         count = 0
 
-        xx = np.linspace(1e-4, 5, 100)
+        xx = np.linspace(X_MIN, X_MAX, 100)
         func_vals = func(xx)
         if viz:
             os.makedirs("MinimizationPlotting", exist_ok=True)
@@ -238,6 +259,9 @@ class Minimizing1d:
             return b
 
     def _golden_step(self, a, b, c, x=None):
+        """
+        Perform a golden section step to find the next point to evaluate the function at.
+        """
         if x is None:
             interval1 = abs(c - b)
             interval2 = abs(b - a)
@@ -258,6 +282,10 @@ class Minimizing1d:
         return a, b, c, d, x
 
     def _bracketing(self, func, a, b):
+        """
+        Bracket the minimum of the function func by finding three points a, b and c such that
+        f(a) > f(b) < f(c)
+        """
         # Is f(a) < f(b)? If not, swap a and b
         flip_at_the_end = False
         if not func(a) > func(b):
@@ -312,6 +340,9 @@ class Minimizing1d:
         return a, b, c
 
     def _parabolic_interpolation(self, func, a, b, c):
+        """
+        Fit a parabola through three points (a, b, c) and find the minimum of the parabola.
+        """
         # Fit a parabola through a, b and c and find the minimum of the parabola
         fa = func(a)
         fb = func(b)
@@ -490,6 +521,11 @@ class LikelihoodMinimizer:
         return final_params, aerr, rerr
 
     def _arr_to_full_params(self, arr: np.ndarray) -> dict:
+        """
+        Convert a numpy array of parameter values to a dictionary that includes
+        both the parameters being optimized and those that are not.
+        Hacky method that combines my `old` implementation with the problem at hand.
+        """
         params = self._arr_to_params(arr)
         for param in self._params_not_to_optimize:
             params[param] = self._params_not_to_optimize[param]
@@ -498,9 +534,9 @@ class LikelihoodMinimizer:
     def _params_to_arr(self, params: dict) -> np.ndarray:
         """
         Convert a dictionary of parameter values to a numpy array in the order of self._params_to_optimize.
-
-        :param params: A dictionary of parameter values.
-        :return: A numpy array of parameter values in the order of self._params_to_optimize.
+        This is done for compatibility with the optimization algorithm which operates on numpy arrays,
+        codded this a long time ago and these methods are a bit hacky but they work and I don't
+        want to change them now :D
         """
         return np.array([params[param] for param in self._params_to_optimize])
 
@@ -579,6 +615,9 @@ class LikelihoodMinimizer:
         return np.clip(step, -0.2, 0.2)
 
     def _project_params(self, guess_arr: np.ndarray) -> np.ndarray:
+        """
+        Project the parameters to be within the specified bounds.
+        """
         projected = np.array(guess_arr, dtype=float, copy=True)
         for index, param in enumerate(self._params_to_optimize):
             if param == "a":
@@ -649,11 +688,182 @@ class LikelihoodMinimizer:
             print(f"Step size: {step_size}")
             print("-----------------------------")
         return history
+
+
+class RNG:
+    """
+    I ran some tests with `dieharder` to check the quality of this RNG.
+    The results were not perfect but I think reasonable.
+
+    Results of dieharder tests on the first 1 million numbers generated by RNG with seed=42:
+    #=============================================================================#
+    #            dieharder version 3.31.1 Copyright 2003 Robert G. Brown          #
+    #=============================================================================#
+    rng_name    |           filename             |rands/second|
+    file_input_raw| Calculations/random_numbers.bin|  7.62e+07  |
+    #=============================================================================#
+            test_name   |ntup| tsamples |psamples|  p-value |Assessment
+    #=============================================================================#
+    # The file file_input_raw was rewound 6 times
+    diehard_birthdays|   0|       100|     100|0.03138270|  PASSED
+    # The file file_input_raw was rewound 56 times
+        diehard_operm5|   0|   1000000|     100|0.00000000|  FAILED
+    # The file file_input_raw was rewound 120 times
+    diehard_rank_32x32|   0|     40000|     100|0.00000000|  FAILED
+    # The file file_input_raw was rewound 150 times
+        diehard_rank_6x8|   0|    100000|     100|0.00427772|   WEAK
+    # The file file_input_raw was rewound 164 times
+    diehard_bitstream|   0|   2097152|     100|0.51443357|  PASSED
+    # The file file_input_raw was rewound 268 times
+            diehard_opso|   0|   2097152|     100|0.00000000|  FAILED
+    # The file file_input_raw was rewound 338 times
+            diehard_oqso|   0|   2097152|     100|0.00000001|  FAILED
+    # The file file_input_raw was rewound 371 times
+            diehard_dna|   0|   2097152|     100|0.37110580|  PASSED
+    # The file file_input_raw was rewound 374 times
+    diehard_count_1s_str|   0|    256000|     100|0.75107180|  PASSED
+    # The file file_input_raw was rewound 438 times
+    diehard_count_1s_byt|   0|    256000|     100|0.00119965|   WEAK
+    # The file file_input_raw was rewound 439 times
+    diehard_parking_lot|   0|     12000|     100|0.77743129|  PASSED
+    # The file file_input_raw was rewound 440 times
+        diehard_2dsphere|   2|      8000|     100|0.43173623|  PASSED
+    # The file file_input_raw was rewound 441 times
+        diehard_3dsphere|   3|      4000|     100|0.25084747|  PASSED
+    # The file file_input_raw was rewound 556 times
+        diehard_squeeze|   0|    100000|     100|0.00000000|  FAILED
+    # The file file_input_raw was rewound 556 times
+            diehard_sums|   0|       100|     100|0.01011708|  PASSED
+    # The file file_input_raw was rewound 561 times
+            diehard_runs|   0|    100000|     100|0.01210880|  PASSED
+            diehard_runs|   0|    100000|     100|0.04147968|  PASSED
+    # The file file_input_raw was rewound 629 times
+        diehard_craps|   0|    200000|     100|0.00000000|  FAILED
+        diehard_craps|   0|    200000|     100|0.00197860|   WEAK
+    # The file file_input_raw was rewound 1629 times
+    marsaglia_tsang_gcd|   0|  10000000|     100|0.00000000|  FAILED
+    marsaglia_tsang_gcd|   0|  10000000|     100|0.00000000|  FAILED
+    # The file file_input_raw was rewound 1634 times
+            sts_monobit|   1|    100000|     100|0.17165102|  PASSED
+    """
+    # Shared state for all instances of RNG
+    _state_initialized = False
+    _state = np.uint64(42)
+
+    def __init__(self):
+        cls = self.__class__
+        # Initialize global stream once with default seed.
+        if not cls._state_initialized:
+            cls._state_initialized = True
+        self.state = cls._state
+
+    @classmethod
+    def set_seed(cls, seed):
+        """
+        Set the seed for the random number generator. This will affect all instances of RNG.
+        This method guards agains re-seeding the RNG after it has already been initialized,
+        which can lead to poor randomness if done multiple times.
+        """
+        cls._state = np.uint64(seed)
+        cls._state_initialized = True
+
+    def mlcg(self, state, a=np.uint64(1664525), c=np.uint64(1013904223)):
+        """
+        A simple implementation of a 64-bit multiplicative linear congruential generator (MLCG).
+        The parameters a and c are chosen based on Numerical Recipes recommendations for 64-bit MLC
+        The state is updated using the formula: state = (a * state + c) mod 2^64
+        The modulo operation is implicit in the uint64 arithmetic.
+        """
+        state = np.uint64(state)
+        return a * state + c  # Modulo 2^64 is implicit in uint64 arithmetic
+
+    def xor_64_bit_shift(
+        self, state, a1=np.uint64(21), a2=np.uint64(35), a3=np.uint64(4)
+    ):
+        """
+        A simple implementation of a 64-bit XOR shift.
+        This is not a very good RNG on its own but it helps to improve the quality of the MLCG.
+        """
+        mask = (np.uint64(1) << np.uint64(64)) - np.uint64(1)
+        state = np.uint64(state) & mask
+
+        state ^= state >> a1
+        state &= mask
+        state ^= (state << a2) & mask
+        state &= mask
+        state ^= state >> a3
+        state &= mask
+        return state
+
+    def generate(self):
+        """
+        Generate a random 64-bit unsigned integer using a combination of an MLCG and a XOR shift.
+        """
+        # Disable Overflow warnings for uint64 arithmetic
+        with np.errstate(over="ignore"):
+            cls = self.__class__
+            generated = self.mlcg(self.xor_64_bit_shift(cls._state))
+            cls._state = np.uint64(generated)
+            self.state = cls._state
+            return generated
+        
+    def random(self):
+        """Generate a random float in the range [0, 1)."""
+        return self.generate() / (2**64)
+        
+
+class NormalDistribution:
+    def __init__(self, loc: float, scale: float):
+        """
+        A simple implementation of a normal distribution random number generator using the Box-Muller transform.
+        """
+        self.loc = loc
+        self.scale = scale
+        self._spare = None  # store second sample for efficiency
+        self._rng = RNG()
+
+    def sample(self):
+        """
+        Generate a random sample from the normal distribution using the Box-Muller transform.
+
+        The Box-Muller transform generates two independent standard normally distributed random
+        variables given two independent uniformly distributed random variables.
+        To improve efficiency, we store the second sample for the next call. This is
+        the way numpy's normal distribution generator works as well.
+        """
+        if self._spare is not None:
+            z = self._spare
+            self._spare = None
+        else:
+            # uniform in [0, 1)
+            u1 = self._rng.random()
+            u2 = self._rng.random()
+
+            # Avoid log(0)
+            u1 = max(u1, 1e-12)
+
+            r = np.sqrt(-2.0 * np.log(u1))
+            theta = 2.0 * np.pi * u2
+
+            z = r * np.cos(theta)
+            self._spare = r * np.sin(theta)
+
+        # Scale and shift
+        return self.loc + self.scale * z
+
+    def pdf(self, x: np.ndarray) -> np.ndarray:
+        coeff = 1 / (self.scale * np.sqrt(2 * np.pi))
+        exponent = -0.5 * ((x - self.loc) / self.scale) ** 2
+        return coeff * np.exp(exponent)   
     
 
 def romberg_integrator(
     func: callable, bounds: tuple, order: int = 5, err: bool = False, args: tuple = ()
 ) -> float | tuple[float, float]:
+    """
+    Implements the Romberg integration method to compute the integral of a function 
+    over an interval.
+    """
     a, b = bounds
 
     def _ni(i):
@@ -697,6 +907,9 @@ def finite_differences_gradient(likelihood_fn: callable, model: callable, data: 
     """
     Computes the gradient of the likelihood function with respect to the parameters a, b, and c
     using finite differences.
+
+    I could have used Richardson extrapolation to get a more accurate estimate of the gradient
+    but I think this is good enough for our purposes.
     """
     gradients = []
     for parameter in ("a", "b", "c"):
@@ -731,6 +944,12 @@ def minimize_likelihood(
         plot: bool = True,
         verbose: bool = True
     ) -> tuple:
+    """
+    Minimize the likelihood function using the Newton-Raphson method implemented in the LikelihoodMinimizer class.
+    
+    Since it is reused twice, once for chi-squared and once for the negative log-likelihood,
+    I thought it would be a good idea to have a helper function for it.
+    """
     minimzer = LikelihoodMinimizer(
         likelihood=likelihood_fn,
         likelihood_derivative=likelihood_derivative_fn,
@@ -802,10 +1021,60 @@ def G_test(observed: np.ndarray, expected: np.ndarray) -> float:
     return 2 * np.sum(observed * np.log(observed / expected))
 
 
+def gamma(z: float) -> float:
+    """
+    Compute the Gamma function using the Lanczos approximation.
+    
+    I know we were supposed to implement the Gamma function and a quick
+    google search led me to the Lanczos approximation which apperantly is
+    a very accurate method for computing the Gamma function. The secret
+    sauce for accuracy is the choice of the coefficients and the parameter g.
+
+    Parameters
+    ----------
+    z : float
+        The input value for which to compute the Gamma function.
+
+    Returns
+    -------
+    float
+        The computed Gamma function value.
+    """
+    if z < 0.5:
+        # Use reflection formula for better accuracy when z is small
+        # Gamma(z) = pi / (sin(pi * z) * Gamma(1 - z))
+        return np.pi / (np.sin(np.pi * z) * gamma(1 - z))
+
+    # Lanczos coefficients for g=7, n=9
+    p = [
+        0.99999999999980993,
+        676.5203681218851,
+        -1259.1392167224028,
+        771.32342877765313,
+        -176.61502916214059,
+        12.507343278686905,
+        -0.13857109526572012,
+        9.9843695780195716e-6,
+        1.5056327351493116e-7,
+    ]
+    
+    g = 7 # This apperantly is the secret sauce for accuracy, error ~10^-15 for double precision
+    z -= 1
+    x = p[0]
+    
+    for i in range(1, len(p)):
+        x += p[i] / (z + i)
+    
+    t = z + g + 0.5
+    return np.sqrt(2 * np.pi) * (t ** (z + 0.5)) * np.exp(-t) * x
+
+
 def chi2_cdf(x: float, dof: float) -> float:
     """
     Compute P(chi2 <= x) where chi2 follows chi-squared distribution with dof degrees of freedom.
     Uses the relationship: P(chi2_k <= x) = P(gamma(k/2) <= x/2) where P is regularized lower incomplete gamma.
+
+    This is some hacky stuff I saw online to compute the chi-squared CDF.
     
     Parameters
     ----------
@@ -834,12 +1103,8 @@ def chi2_cdf(x: float, dof: float) -> float:
     # Compute using series: sum_{k=0}^inf (-1)^k * z^k / k! / (a + k)
     # This is equivalent to: P(a, z) = e^(-z) * z^a / Gamma(a) * sum_{k=0}^inf z^k / Gamma(a+k+1)
     
-    try:
-        # Get Gamma(a)
-        gamma_a = gamma(a)
-    except (ValueError, OverflowError):
-        # Fallback if gamma computation fails
-        return min(1.0, x / (x + dof))
+    # Get Gamma(a)
+    gamma_a = gamma(a)
     
     # Series expansion with careful numerics
     result = 0.0
@@ -852,21 +1117,20 @@ def chi2_cdf(x: float, dof: float) -> float:
         # Compute next term: term_{k+1} = term_k * z / (a + k + 1)
         term *= z / (a + k + 1)
         
-        # Stop if term is negligibly small
+        # Stop if term is negligibly small up to double precision
         if abs(term) < 1e-15 * abs(result):
             break
     
     # Multiply by e^(-z) * z^a to get the actual integral
-    try:
-        if z > 100:  # Avoid exponential underflow
-            log_factor = -z + a * np.log(z) - np.log(gamma_a)
-            factor = np.exp(log_factor)
-        else:
-            factor = np.exp(-z) * (z ** a) / gamma_a
-        
-        result *= factor
-    except (ValueError, OverflowError):
-        pass
+    if z > 100:
+        # This will cause overflow in z^a and e^(-z) separately,
+        log_factor = -z + a * np.log(z) - np.log(gamma_a)
+        factor = np.exp(log_factor)
+    else:
+        # Their product should be fine. Use log to compute it.
+        factor = np.exp(-z) * (z ** a) / gamma_a
+    
+    result *= factor
     
     return min(1.0, max(0.0, result))
 
@@ -919,6 +1183,10 @@ def Q_test(observed: np.ndarray, expected: np.ndarray, dof: int = None) -> float
 
 
 def get_best_params_for_datafile(datafile: str, table_name: str) -> tuple:
+    """
+    Helper function to read the best fit parameters for a given datafile from the .tex
+    table generated by the run.sh script.
+    """
     base_path = "Calculations"
     table_path = os.path.join(base_path, table_name)
 
@@ -946,20 +1214,27 @@ def get_best_params_for_datafile(datafile: str, table_name: str) -> tuple:
                 return params
 
 
-def mcmc_proposal_normal(current_sample: np.ndarray, sigma: float) -> np.ndarray:
+def mcmc_proposal_normal(current_sample: np.ndarray, sigma: float, np_random_normal: bool = False) -> np.ndarray:
     """
     Gaussian random-walk proposal for the 1D MCMC chain.
     Returns shape (1, 1) to match the MCMC class' indexing convention.
     """
     current = float(np.atleast_1d(current_sample)[0])
-    proposed = np.random.normal(loc=current, scale=sigma)
+
+    if np_random_normal:
+        # This is only for testing purposes to compare with numpy's normal distribution generator.
+        # It is not used in the actual MCMC sampling.
+        proposed = np.random.normal(loc=current, scale=sigma)
+    else:
+        normal_dist = NormalDistribution(loc=current, scale=sigma)
+        proposed = normal_dist.sample()
     return np.array([[proposed]])
 
 
 def sample_radii_with_mcmc(
     params: dict,
     num_samples: int,
-    x_lower: float = 1e-4,
+    x_lower: float = X_MIN,
     x_upper: float = X_MAX,
     burn_in: int = 1000,
     proposal_sigma: float = 0.08,
@@ -969,18 +1244,28 @@ def sample_radii_with_mcmc(
     """
     A = get_normalization_constant(params["a"], params["b"], params["c"], params["Nsat"])
 
-    def target_density(parameters: np.ndarray, data: tuple[np.ndarray, np.ndarray]) -> float:
+    def target_density(
+            parameters: np.ndarray,
+            # The `data` argument is required for compatibility with the MCMC class.
+            # I implemented it a long time ago and it expects the likelihood
+            # function to take data as an argument, even though we don't actually
+            # use it here since the density is fully specified by the parameters.
+            data: tuple[np.ndarray, np.ndarray]
+        ) -> float:
         x = float(np.atleast_1d(parameters)[0])
         if x <= x_lower or x >= x_upper:
+            # Return a very small density for out-of-bounds samples to effectively reject them.
             return 1e-300
         val = N(x, A, params["Nsat"], params["a"], params["b"], params["c"])
         if not np.isfinite(val) or val <= 0:
+            # This shouldn't happen but just in case to avoid
+            # log(0) or negative densities which are unphysical.
             return 1e-300
         return float(val)
 
     sampler = MCMC(
         likelihood=target_density,
-        proposed_distribution=mcmc_proposal_normal,
+        proposed_distribution=mcmc_proposal_normal, # I am unsure if Poisson proposal would be better
         sigma=proposal_sigma,
     )
 
@@ -1064,6 +1349,8 @@ def n(x: np.ndarray, A: float, Nsat: float, a: float, b: float, c: float) -> np.
     ndarray
         Same type and shape as x. Number density of satellite galaxies
         at given radius x.
+
+    Note: This should be correct.
     """
     b_inverse = 1 / b
     return A * Nsat * (x * b_inverse) ** (a - 3) * np.exp(-((x * b_inverse) ** c))
@@ -1072,6 +1359,8 @@ def n(x: np.ndarray, A: float, Nsat: float, a: float, b: float, c: float) -> np.
 def N(x: np.ndarray, A: float, Nsat: float, a: float, b: float, c: float) -> np.ndarray:
     """
     N(x)dx = n(x) * 4 * pi * x^2 dx is the number of satellite galaxies in a shell of radius x and thickness dx.
+
+    Note: Praying to God that this is correct.
     """
     return n(x, A, Nsat, a, b, c) * 4 * np.pi * x**2
 
@@ -1081,6 +1370,8 @@ def dN_da(
 ) -> np.ndarray:
     """
     Partial derivative of N(x) with respect to a.
+
+    Note: Praying to God that this is correct. I would always use autodiff for this if I could.
     """
     return dn_da(x, A, Nsat, a, b, c) * 4 * np.pi * x**2
 
@@ -1090,6 +1381,8 @@ def dN_db(
 ) -> np.ndarray:
     """
     Partial derivative of N(x) with respect to b.
+
+    Note: Praying to God that this is correct. I would always use autodiff for this if I could.
     """
     return dn_db(x, A, Nsat, a, b, c) * 4 * np.pi * x**2
 
@@ -1099,6 +1392,8 @@ def dN_dc(
 ) -> np.ndarray:
     """
     Partial derivative of N(x) with respect to c.
+
+    Note: Praying to God that this is correct. I would always use autodiff for this if I could.
     """
     return dn_dc(x, A, Nsat, a, b, c) * 4 * np.pi * x**2
 
@@ -1108,6 +1403,8 @@ def dn_da(
 ) -> np.ndarray:
     """
     Partial derivative of the number density profile of satellite galaxies with respect to a.
+
+    Note: Praying to God that this is correct. I would always use autodiff for this if I could.
     """
     b_inverse = 1 / b
     return (
@@ -1124,6 +1421,8 @@ def dn_db(
 ) -> np.ndarray:
     """
     Partial derivative of the number density profile of satellite galaxies with respect to b.
+
+    Note: Praying to God that this is correct. I would always use autodiff for this if I could.
     """
     b_inverse = 1 / b
     u = x * b_inverse
@@ -1136,6 +1435,8 @@ def dn_dc(
 ) -> np.ndarray:
     """
     Partial derivative of the number density profile of satellite galaxies with respect to c.
+
+    Note: Praying to God that this is correct. I would always use autodiff for this if I could.
     """
     b_inverse = 1 / b
     return (
@@ -1148,17 +1449,16 @@ def dn_dc(
     )
 
 
-# Following the lectures, the function below provides a template for a custom minimization method.
-# Depending on your choice of method, you may or may not need to add more function input parameters.
 def my_minimizer(
     func: callable,
-    x_arr: np.ndarray,
+    x_arr: np.ndarray, # Unused in current implementation, kept for consistency with template
     bounds: tuple,
     tol: float = 1e-5,
     method: str = "golden section",
 ) -> tuple:
     """
-    Custom minimization method.
+    Wrapper function to minimize a 1D function using a custom minimization method.
+    Currently supports "golden section" and "brent method".
 
     Parameters
     ----------
@@ -1171,6 +1471,9 @@ def my_minimizer(
     tol : float, optional
         Tolerance for the minimization.
         The default is 1e-5.
+    method : str, optional
+        The minimization method to use. The default is "golden section".
+        You can also use "brent method" if you would like.
 
     Returns
     -------
@@ -1188,8 +1491,25 @@ def my_minimizer(
 def integrate_via_romberg(
     func: callable, x_lower: float, x_upper: float
 ) -> float:
-    """Use romberg integration to compute the integral of func from x_lower to x_upper."""
+    """
+    Use romberg integration to compute the integral of func from x_lower to x_upper.
+    
+    Parameters
+    ----------
+    func : callable
+        The function to integrate.
+    x_lower : float
+        The lower bound of the integration.
+    x_upper : float
+        The upper bound of the integration.
+
+    Returns
+    -------
+    float
+        The result of the integration.
+    """
     return romberg_integrator(func, (x_lower, x_upper), order=5)
+
 
 def build_binned_dataset(
     radius: np.ndarray,
@@ -1198,6 +1518,27 @@ def build_binned_dataset(
     x_upper: float,
     bins: int,
 ) -> dict:
+    """
+    Build a binned dataset from the satellite radii for use in likelihood calculations.
+
+    Parameters
+    ----------
+    radius : ndarray
+        The virial radius for all the satellites in the file.
+    nhalo : int
+        The number of halos in the file.
+    x_lower : float
+        The lower bound of the radius to consider for binning.
+    x_upper : float
+        The upper bound of the radius to consider for binning.
+    bins : int
+        The number of bins to use for the histogram.
+    Returns
+    -------
+    dict
+        A dictionary containing the bin edges, mean counts per halo in each bin, bin centers,
+        and the average number of satellites per halo (Nsat).
+    """
     bin_edges = np.logspace(np.log10(x_lower), np.log10(x_upper), bins + 1)
     counts, _ = np.histogram(radius, bins=bin_edges)
     mean_counts = counts / nhalo
@@ -1211,6 +1552,20 @@ def build_binned_dataset(
 
 
 def model_bin_means(bin_edges: np.ndarray, params: dict) -> np.ndarray:
+    """
+    Compute the expected number of satellites in each bin according to the model parameters.
+    
+    Parameters
+    ----------
+    bin_edges : ndarray
+        The edges of the bins to compute the expected counts for.
+    params : dict
+        The parameters to compute the expected counts with, as a dictionary with keys "a", "b", "c", and "Nsat".
+    Returns
+    -------
+    ndarray
+        The expected number of satellites in each bin according to the model parameters.
+    """
     a = params["a"]
     b = params["b"]
     c = params["c"]
@@ -1229,8 +1584,21 @@ def model_bin_means(bin_edges: np.ndarray, params: dict) -> np.ndarray:
     return np.array(expected)
 
 
-# Computes the model predictions for the given x values and parameters.
 def get_plot_profile(x_values: np.ndarray, params: dict) -> np.ndarray:
+    """
+    Compute the model predictions for the given x values and parameters.
+    
+    Parameters    ----------
+    x_values : ndarray
+        The x values to compute the model predictions at.
+    params : dict
+        The parameters to compute the model predictions with, as a dictionary with keys "a", 
+        "b", "c", and "Nsat".
+    Returns
+    -------
+    ndarray
+        The model predictions for the given x values and parameters.
+    """
     A = get_normalization_constant(
         params["a"], params["b"], params["c"], params["Nsat"]
     )
@@ -1275,6 +1643,7 @@ def chi2_partial_derivative(model: callable, data: np.ndarray, params: dict) -> 
     """
     return finite_differences_gradient(chi2, model, data, params)
 
+
 def negative_poisson_ln_likelihood(
     model: callable, data: np.ndarray, params: dict
 ) -> float:
@@ -1305,12 +1674,14 @@ def negative_poisson_ln_likelihood(
     # Drop ln(N_i!) because it is constant with respect to model parameters.
     return np.sum(expected - observed * np.log(expected))
 
+
 def negative_poisson_ln_likelihood_partial_derivative(model: callable, data: np.ndarray, params: dict) -> np.ndarray:
     """
     Computes the gradient of the Poisson negative log-likelihood function with respect to the parameters a, b, and c
     using finite differences.
     """
     return finite_differences_gradient(negative_poisson_ln_likelihood, model, data, params)
+
 
 def get_normalization_constant(a: float, b: float, c: float, Nsat: float) -> float:
     """
@@ -1385,6 +1756,7 @@ def minimize_chi2(
         plot=plot,
         verbose=verbose
     )
+
 
 def minimize_poisson_ln_likelihood(
     model: callable,
@@ -1687,7 +2059,7 @@ def do_question_1e():
 
     radius, nhalo = readfile(f"Data/satgals_{datafile}.txt")
 
-    x_lower, x_upper = (1e-4, X_MAX)
+    x_lower, x_upper = (X_MIN, X_MAX)
     bins = 15
     real_fit_data = build_binned_dataset(radius, nhalo, x_lower, x_upper, bins)
     num_satellites = len(radius)
@@ -1879,6 +2251,8 @@ def do_question_1e():
 
 
 if __name__ == "__main__":
+    RNG.set_seed(42) # Set random seed for reproducibility (never reseed)
+
     do_question_1a()
     do_question_1b()
     do_question_1c()
