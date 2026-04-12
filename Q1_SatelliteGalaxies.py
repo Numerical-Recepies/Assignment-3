@@ -5,7 +5,6 @@ from typing import Callable, Any
 import numpy as np
 import matplotlib.pyplot as plt
 
-
 # Glob variable for the maximum and minimum x value in the plots and optimization
 X_MIN = 1e-4
 X_MAX = 5.0
@@ -14,6 +13,7 @@ X_MAX = 5.0
 # =====================================================
 # ========== Helper functions and classes =============
 # =====================================================
+
 
 class MCMC:
     """
@@ -80,9 +80,9 @@ class MCMC:
             )
             trial_sample = np.array(trial_sample[0])
 
-            a = self._likelihood(
-                parameters=trial_sample, data=data
-            ) / self._likelihood(parameters=samples[-1], data=data)
+            a = self._likelihood(parameters=trial_sample, data=data) / self._likelihood(
+                parameters=samples[-1], data=data
+            )
 
             if a > 1:
                 samples.append(trial_sample)
@@ -103,9 +103,7 @@ class MCMC:
 
         return retained_samples
 
-    def _print_analytics(
-        self, num_accepted_samples: int, num_total_samples: int
-    ):
+    def _print_analytics(self, num_accepted_samples: int, num_total_samples: int):
         """
         Prints summary statistics of the sampling process.
 
@@ -136,9 +134,7 @@ class MCMC:
         print("-" * line_length)
         print(format_line(header.center(line_length - 4)))
         print("-" * line_length)
-        print(
-            format_line(f"Number of accepted samples = {num_accepted_samples}")
-        )
+        print(format_line(f"Number of accepted samples = {num_accepted_samples}"))
         print(format_line(f"Number of total samples = {num_total_samples}"))
         print("-" * line_length)
         print(format_line(f"Acceptance rate = {acceptance_rate:.2f} %"))
@@ -176,8 +172,9 @@ class Minimizing1d:
     def _brent_method(self, func, a, b, tol, viz, vizstep):
         """
         Perform Brent's method to find the minimum of the function func in the interval [a, b].
-        
-        `vizstep` is not implemented yet for Brent's method and is here for consistency."""
+
+        `vizstep` is not implemented yet for Brent's method and is here for consistency.
+        """
         if viz:
             print("Brent's method vizualization not implemented yet!")
             print("Proceeding without vizualization...")
@@ -477,7 +474,8 @@ class LikelihoodMinimizer:
                 )
 
                 if np.isfinite(new_likelihood) and (
-                    not np.isfinite(current_likelihood) or new_likelihood <= current_likelihood
+                    not np.isfinite(current_likelihood)
+                    or new_likelihood <= current_likelihood
                 ):
                     accepted_step = True
                     break
@@ -510,9 +508,13 @@ class LikelihoodMinimizer:
             # relative error is less than the threshold
             if self._check_convergence(aerr, rerr, atol, rtol, iteration_count):
                 break
-            if likelihood_change < atol or likelihood_change < rtol * max(abs(current_likelihood), 1.0):
+            if likelihood_change < atol or likelihood_change < rtol * max(
+                abs(current_likelihood), 1.0
+            ):
                 if self._verbose:
-                    print(f"Likelihood minimization converged at iteration {iteration_count}!")
+                    print(
+                        f"Likelihood minimization converged at iteration {iteration_count}!"
+                    )
                 break
 
         final_params = self._arr_to_params(initial_guess_arr)
@@ -650,11 +652,15 @@ class LikelihoodMinimizer:
         self, guess_arr: np.ndarray, history: dict = {}, itteration_count: int = 0
     ):
         func_value = self._likelihood(
-            model=self._model, data=self._data, params=self._arr_to_full_params(guess_arr)
+            model=self._model,
+            data=self._data,
+            params=self._arr_to_full_params(guess_arr),
         )
         derivative_falue = np.asarray(
             self._likelihood_derivative(
-                model=self._model, data=self._data, params=self._arr_to_full_params(guess_arr)
+                model=self._model,
+                data=self._data,
+                params=self._arr_to_full_params(guess_arr),
             ),
             dtype=float,
         )
@@ -746,6 +752,7 @@ class RNG:
     # The file file_input_raw was rewound 1634 times
             sts_monobit|   1|    100000|     100|0.17165102|  PASSED
     """
+
     # Shared state for all instances of RNG
     _state_initialized = False
     _state = np.uint64(42)
@@ -806,11 +813,11 @@ class RNG:
             cls._state = np.uint64(generated)
             self.state = cls._state
             return generated
-        
+
     def random(self):
         """Generate a random float in the range [0, 1)."""
         return self.generate() / (2**64)
-        
+
 
 class NormalDistribution:
     def __init__(self, loc: float, scale: float):
@@ -854,14 +861,14 @@ class NormalDistribution:
     def pdf(self, x: np.ndarray) -> np.ndarray:
         coeff = 1 / (self.scale * np.sqrt(2 * np.pi))
         exponent = -0.5 * ((x - self.loc) / self.scale) ** 2
-        return coeff * np.exp(exponent)   
-    
+        return coeff * np.exp(exponent)
+
 
 def romberg_integrator(
     func: callable, bounds: tuple, order: int = 5, err: bool = False, args: tuple = ()
 ) -> float | tuple[float, float]:
     """
-    Implements the Romberg integration method to compute the integral of a function 
+    Implements the Romberg integration method to compute the integral of a function
     over an interval.
     """
     a, b = bounds
@@ -903,7 +910,9 @@ def romberg_integrator(
     return result
 
 
-def finite_differences_gradient(likelihood_fn: callable, model: callable, data: np.ndarray, params: dict) -> float:
+def finite_differences_gradient(
+    likelihood_fn: callable, model: callable, data: np.ndarray, params: dict
+) -> float:
     """
     Computes the gradient of the likelihood function with respect to the parameters a, b, and c
     using finite differences.
@@ -925,28 +934,33 @@ def finite_differences_gradient(likelihood_fn: callable, model: callable, data: 
         if not np.isfinite(likelihood_plus) and not np.isfinite(likelihood_minus):
             gradients.append(0.0)
         elif not np.isfinite(likelihood_minus):
-            gradients.append((likelihood_plus - likelihood_fn(model, data, params)) / step)
+            gradients.append(
+                (likelihood_plus - likelihood_fn(model, data, params)) / step
+            )
         elif not np.isfinite(likelihood_plus):
-            gradients.append((likelihood_fn(model, data, params) - likelihood_minus) / step)
+            gradients.append(
+                (likelihood_fn(model, data, params) - likelihood_minus) / step
+            )
         else:
             gradients.append((likelihood_plus - likelihood_minus) / (2 * step))
 
     return np.array(gradients)
 
+
 def minimize_likelihood(
-        likelihood_fn: callable,
-        likelihood_derivative_fn: callable,
-        model: callable,
-        data: np.ndarray,
-        initial_params: tuple,
-        datafile: str,
-        likelihood_fn_name: str = "chi2",
-        plot: bool = True,
-        verbose: bool = True
-    ) -> tuple:
+    likelihood_fn: callable,
+    likelihood_derivative_fn: callable,
+    model: callable,
+    data: np.ndarray,
+    initial_params: tuple,
+    datafile: str,
+    likelihood_fn_name: str = "chi2",
+    plot: bool = True,
+    verbose: bool = True,
+) -> tuple:
     """
     Minimize the likelihood function using the Newton-Raphson method implemented in the LikelihoodMinimizer class.
-    
+
     Since it is reused twice, once for chi-squared and once for the negative log-likelihood,
     I thought it would be a good idea to have a helper function for it.
     """
@@ -978,7 +992,9 @@ def minimize_likelihood(
     )
 
     if plot:
-        minimzer.plot_history(filename=f"{likelihood_fn_name}_minimization_history_{datafile}.png")
+        minimzer.plot_history(
+            filename=f"{likelihood_fn_name}_minimization_history_{datafile}.png"
+        )
 
     best_params = (final_params["a"], final_params["b"], final_params["c"])
     min_likelihood = likelihood_fn(
@@ -1013,9 +1029,9 @@ def G_test(observed: np.ndarray, expected: np.ndarray) -> float:
     # Extra precaution to avoid log(0) which shouldn't happen
     if len(observed) == 0:
         return np.inf
-    
-    mask = (observed > 0) & (expected > 0) # Only consider valid bins
-    observed = observed[mask] 
+
+    mask = (observed > 0) & (expected > 0)  # Only consider valid bins
+    observed = observed[mask]
     expected = expected[mask]
 
     return 2 * np.sum(observed * np.log(observed / expected))
@@ -1024,7 +1040,7 @@ def G_test(observed: np.ndarray, expected: np.ndarray) -> float:
 def gamma(z: float) -> float:
     """
     Compute the Gamma function using the Lanczos approximation.
-    
+
     I know we were supposed to implement the Gamma function and a quick
     google search led me to the Lanczos approximation which apperantly is
     a very accurate method for computing the Gamma function. The secret
@@ -1057,14 +1073,14 @@ def gamma(z: float) -> float:
         9.9843695780195716e-6,
         1.5056327351493116e-7,
     ]
-    
-    g = 7 # This apperantly is the secret sauce for accuracy, error ~10^-15 for double precision
+
+    g = 7  # This apperantly is the secret sauce for accuracy, error ~10^-15 for double precision
     z -= 1
     x = p[0]
-    
+
     for i in range(1, len(p)):
         x += p[i] / (z + i)
-    
+
     t = z + g + 0.5
     return np.sqrt(2 * np.pi) * (t ** (z + 0.5)) * np.exp(-t) * x
 
@@ -1075,14 +1091,14 @@ def chi2_cdf(x: float, dof: float) -> float:
     Uses the relationship: P(chi2_k <= x) = P(gamma(k/2) <= x/2) where P is regularized lower incomplete gamma.
 
     This is some hacky stuff I saw online to compute the chi-squared CDF.
-    
+
     Parameters
     ----------
     x : float
         Chi-squared statistic value
     dof : float
         Degrees of freedom
-    
+
     Returns
     -------
     float
@@ -1092,35 +1108,35 @@ def chi2_cdf(x: float, dof: float) -> float:
         return 0.0
     if dof <= 0:
         return 1.0
-    
-    a = dof / 2.0  #shape parameter for gamma
-    z = x / 2.0    # scale parameter
-    
+
+    a = dof / 2.0  # shape parameter for gamma
+    z = x / 2.0  # scale parameter
+
     # Compute regularized lower incomplete gamma: P(a, z) = gamma(a, z) / Gamma(a)
     # Using series expansion for P(a, z)
     # P(a, z) = (1/Gamma(a)) * ∫_0^z t^(a-1) * e^(-t) dt
-    
+
     # Compute using series: sum_{k=0}^inf (-1)^k * z^k / k! / (a + k)
     # This is equivalent to: P(a, z) = e^(-z) * z^a / Gamma(a) * sum_{k=0}^inf z^k / Gamma(a+k+1)
-    
+
     # Get Gamma(a)
     gamma_a = gamma(a)
-    
+
     # Series expansion with careful numerics
     result = 0.0
     term = 1.0 / gamma_a  # First coefficient
-    
+
     for k in range(300):
         # Add term to sum
         result += term
-        
+
         # Compute next term: term_{k+1} = term_k * z / (a + k + 1)
         term *= z / (a + k + 1)
-        
+
         # Stop if term is negligibly small up to double precision
         if abs(term) < 1e-15 * abs(result):
             break
-    
+
     # Multiply by e^(-z) * z^a to get the actual integral
     if z > 100:
         # This will cause overflow in z^a and e^(-z) separately,
@@ -1128,57 +1144,37 @@ def chi2_cdf(x: float, dof: float) -> float:
         factor = np.exp(log_factor)
     else:
         # Their product should be fine. Use log to compute it.
-        factor = np.exp(-z) * (z ** a) / gamma_a
-    
+        factor = np.exp(-z) * (z**a) / gamma_a
+
     result *= factor
-    
+
     return min(1.0, max(0.0, result))
 
 
-def Q_test(observed: np.ndarray, expected: np.ndarray, dof: int = None) -> float:
+def Q_from_G(G_stat: float, dof: int = None) -> float:
     """
-    Compute the p-value (significance Q) for the goodness of fit test.
-    
-    This computes the chi-squared test statistic and converts it to a p-value
-    using the chi-squared CDF.
+    Compute the p-value (significance Q) for the G-test goodness of fit.
+
+    This computes the p-value from the G-test statistic using the chi-squared distribution.
 
     Parameters
     ----------
-    observed : ndarray
-        The observed counts in each bin.
-    expected : ndarray
-        The expected counts in each bin according to the model.
+    G_stat : float
+        The G-test statistic value.
     dof : int, optional
         Degrees of freedom. If None, defaults to number of bins - 3 (for 3 fitted parameters).
-    
     Returns
     -------
     float
-        The p-value (Q): P(chi2 >= observed_statistic)
+        The p-value (Q): P(chi2 > G_stat)
     """
-    # No way to compare if there are no observed counts
-    if len(observed) == 0:
-        return np.inf
-    
-    mask = (observed > 0) & (expected > 0) # Only consider valid bins
-    observed = observed[mask] 
-    expected = expected[mask]
-    
-    # Compute chi-squared test statistic
-    chi2_stat = np.sum((observed - expected) ** 2 / expected)
-    
     # If dof not provided, use number of bins minus 3 (for 3 fitted parameters a, b, c)
     if dof is None:
-        dof = len(observed) - 3
-    
-    # Ensure dof is at least 1
-    if dof <= 0:
-        dof = 1
-    
-    # Compute p-value: Q = P(chi2 > chi2_stat) = 1 - CDF(chi2_stat)
-    cdf_value = chi2_cdf(chi2_stat, dof)
+        dof = 1  # G-test with 1 degree of freedom is common for goodness of fit
+
+    # Compute p-value: Q = P(chi2 > G_stat) = 1 - CDF(G_stat)
+    cdf_value = chi2_cdf(G_stat, dof)
     Q = 1.0 - cdf_value
-    
     return Q
 
 
@@ -1192,8 +1188,10 @@ def get_best_params_for_datafile(datafile: str, table_name: str) -> tuple:
 
     # Throw an error if the table doesn't exist
     if not os.path.exists(table_path):
-        raise FileNotFoundError(f"Table {table_name} not found in {base_path} directory. Please run . run.sh to generate it!")
-    
+        raise FileNotFoundError(
+            f"Table {table_name} not found in {base_path} directory. Please run . run.sh to generate it!"
+        )
+
     # Read from .tex table
     # Lines look like f"m{idx+11} & {N:.5f} & {chi2_val:.5f} & {a:.5f} & {b:.5f} & {c:.5f}{line_end}\n"
     params = {
@@ -1214,7 +1212,9 @@ def get_best_params_for_datafile(datafile: str, table_name: str) -> tuple:
                 return params
 
 
-def mcmc_proposal_normal(current_sample: np.ndarray, sigma: float, np_random_normal: bool = False) -> np.ndarray:
+def mcmc_proposal_normal(
+    current_sample: np.ndarray, sigma: float, np_random_normal: bool = False
+) -> np.ndarray:
     """
     Gaussian random-walk proposal for the 1D MCMC chain.
     Returns shape (1, 1) to match the MCMC class' indexing convention.
@@ -1242,16 +1242,18 @@ def sample_radii_with_mcmc(
     """
     Draw satellite radii samples from the shell-count profile using Metropolis-Hastings.
     """
-    A = get_normalization_constant(params["a"], params["b"], params["c"], params["Nsat"])
+    A = get_normalization_constant(
+        params["a"], params["b"], params["c"], params["Nsat"]
+    )
 
     def target_density(
-            parameters: np.ndarray,
-            # The `data` argument is required for compatibility with the MCMC class.
-            # I implemented it a long time ago and it expects the likelihood
-            # function to take data as an argument, even though we don't actually
-            # use it here since the density is fully specified by the parameters.
-            data: tuple[np.ndarray, np.ndarray]
-        ) -> float:
+        parameters: np.ndarray,
+        # The `data` argument is required for compatibility with the MCMC class.
+        # I implemented it a long time ago and it expects the likelihood
+        # function to take data as an argument, even though we don't actually
+        # use it here since the density is fully specified by the parameters.
+        data: tuple[np.ndarray, np.ndarray],
+    ) -> float:
         x = float(np.atleast_1d(parameters)[0])
         if x <= x_lower or x >= x_upper:
             # Return a very small density for out-of-bounds samples to effectively reject them.
@@ -1265,7 +1267,7 @@ def sample_radii_with_mcmc(
 
     sampler = MCMC(
         likelihood=target_density,
-        proposed_distribution=mcmc_proposal_normal, # I am unsure if Poisson proposal would be better
+        proposed_distribution=mcmc_proposal_normal,  # I am unsure if Poisson proposal would be better
         sigma=proposal_sigma,
     )
 
@@ -1278,7 +1280,9 @@ def sample_radii_with_mcmc(
         burn_in=burn_in,
     )
 
-    radii = np.array([float(np.atleast_1d(s)[0]) for s in retained_samples], dtype=float)
+    radii = np.array(
+        [float(np.atleast_1d(s)[0]) for s in retained_samples], dtype=float
+    )
     return radii[:num_samples]
 
 
@@ -1365,93 +1369,9 @@ def N(x: np.ndarray, A: float, Nsat: float, a: float, b: float, c: float) -> np.
     return n(x, A, Nsat, a, b, c) * 4 * np.pi * x**2
 
 
-def dN_da(
-    x: np.ndarray, A: float, Nsat: float, a: float, b: float, c: float
-) -> np.ndarray:
-    """
-    Partial derivative of N(x) with respect to a.
-
-    Note: Praying to God that this is correct. I would always use autodiff for this if I could.
-    """
-    return dn_da(x, A, Nsat, a, b, c) * 4 * np.pi * x**2
-
-
-def dN_db(
-    x: np.ndarray, A: float, Nsat: float, a: float, b: float, c: float
-) -> np.ndarray:
-    """
-    Partial derivative of N(x) with respect to b.
-
-    Note: Praying to God that this is correct. I would always use autodiff for this if I could.
-    """
-    return dn_db(x, A, Nsat, a, b, c) * 4 * np.pi * x**2
-
-
-def dN_dc(
-    x: np.ndarray, A: float, Nsat: float, a: float, b: float, c: float
-) -> np.ndarray:
-    """
-    Partial derivative of N(x) with respect to c.
-
-    Note: Praying to God that this is correct. I would always use autodiff for this if I could.
-    """
-    return dn_dc(x, A, Nsat, a, b, c) * 4 * np.pi * x**2
-
-
-def dn_da(
-    x: np.ndarray, A: float, Nsat: float, a: float, b: float, c: float
-) -> np.ndarray:
-    """
-    Partial derivative of the number density profile of satellite galaxies with respect to a.
-
-    Note: Praying to God that this is correct. I would always use autodiff for this if I could.
-    """
-    b_inverse = 1 / b
-    return (
-        A
-        * Nsat
-        * (x * b_inverse) ** (a - 3)
-        * np.exp(-((x * b_inverse) ** c))
-        * np.log(x * b_inverse)
-    )
-
-
-def dn_db(
-    x: np.ndarray, A: float, Nsat: float, a: float, b: float, c: float
-) -> np.ndarray:
-    """
-    Partial derivative of the number density profile of satellite galaxies with respect to b.
-
-    Note: Praying to God that this is correct. I would always use autodiff for this if I could.
-    """
-    b_inverse = 1 / b
-    u = x * b_inverse
-    n_val = A * Nsat * u ** (a - 3) * np.exp(-(u**c))
-    return n_val * b_inverse * ((3 - a) + c * u**c)
-
-
-def dn_dc(
-    x: np.ndarray, A: float, Nsat: float, a: float, b: float, c: float
-) -> np.ndarray:
-    """
-    Partial derivative of the number density profile of satellite galaxies with respect to c.
-
-    Note: Praying to God that this is correct. I would always use autodiff for this if I could.
-    """
-    b_inverse = 1 / b
-    return (
-        A
-        * Nsat
-        * (x * b_inverse) ** (a - 3)
-        * np.exp(-((x * b_inverse) ** c))
-        * (-((x * b_inverse) ** c))
-        * np.log(x * b_inverse)
-    )
-
-
 def my_minimizer(
     func: callable,
-    x_arr: np.ndarray, # Unused in current implementation, kept for consistency with template
+    x_arr: np.ndarray,  # Unused in current implementation, kept for consistency with template
     bounds: tuple,
     tol: float = 1e-5,
     method: str = "golden section",
@@ -1488,12 +1408,10 @@ def my_minimizer(
     return x_min, func_min
 
 
-def integrate_via_romberg(
-    func: callable, x_lower: float, x_upper: float
-) -> float:
+def integrate_via_romberg(func: callable, x_lower: float, x_upper: float) -> float:
     """
     Use romberg integration to compute the integral of func from x_lower to x_upper.
-    
+
     Parameters
     ----------
     func : callable
@@ -1554,7 +1472,7 @@ def build_binned_dataset(
 def model_bin_means(bin_edges: np.ndarray, params: dict) -> np.ndarray:
     """
     Compute the expected number of satellites in each bin according to the model parameters.
-    
+
     Parameters
     ----------
     bin_edges : ndarray
@@ -1575,11 +1493,7 @@ def model_bin_means(bin_edges: np.ndarray, params: dict) -> np.ndarray:
     expected = []
     for x_left, x_right in zip(bin_edges[:-1], bin_edges[1:]):
         expected.append(
-            integrate_via_romberg(
-                lambda x: N(x, A, Nsat, a, b, c),
-                x_left,
-                x_right
-            )
+            integrate_via_romberg(lambda x: N(x, A, Nsat, a, b, c), x_left, x_right)
         )
     return np.array(expected)
 
@@ -1587,12 +1501,12 @@ def model_bin_means(bin_edges: np.ndarray, params: dict) -> np.ndarray:
 def get_plot_profile(x_values: np.ndarray, params: dict) -> np.ndarray:
     """
     Compute the model predictions for the given x values and parameters.
-    
+
     Parameters    ----------
     x_values : ndarray
         The x values to compute the model predictions at.
     params : dict
-        The parameters to compute the model predictions with, as a dictionary with keys "a", 
+        The parameters to compute the model predictions with, as a dictionary with keys "a",
         "b", "c", and "Nsat".
     Returns
     -------
@@ -1675,12 +1589,16 @@ def negative_poisson_ln_likelihood(
     return np.sum(expected - observed * np.log(expected))
 
 
-def negative_poisson_ln_likelihood_partial_derivative(model: callable, data: np.ndarray, params: dict) -> np.ndarray:
+def negative_poisson_ln_likelihood_partial_derivative(
+    model: callable, data: np.ndarray, params: dict
+) -> np.ndarray:
     """
     Computes the gradient of the Poisson negative log-likelihood function with respect to the parameters a, b, and c
     using finite differences.
     """
-    return finite_differences_gradient(negative_poisson_ln_likelihood, model, data, params)
+    return finite_differences_gradient(
+        negative_poisson_ln_likelihood, model, data, params
+    )
 
 
 def get_normalization_constant(a: float, b: float, c: float, Nsat: float) -> float:
@@ -1719,13 +1637,13 @@ def get_normalization_constant(a: float, b: float, c: float, Nsat: float) -> flo
 
 
 def minimize_chi2(
-        model: callable,
-        data: np.ndarray,
-        initial_params: tuple,
-        datafile: str,
-        plot: bool = True,
-        verbose: bool = True
-    ) -> tuple:
+    model: callable,
+    data: np.ndarray,
+    initial_params: tuple,
+    datafile: str,
+    plot: bool = True,
+    verbose: bool = True,
+) -> tuple:
     """
     Minimize the chi-squared value for a given model and data.
 
@@ -1751,10 +1669,10 @@ def minimize_chi2(
         model=model,
         data=data,
         initial_params=initial_params,
-        datafile=datafile,       
+        datafile=datafile,
         likelihood_fn_name="chi2",
         plot=plot,
-        verbose=verbose
+        verbose=verbose,
     )
 
 
@@ -1764,7 +1682,7 @@ def minimize_poisson_ln_likelihood(
     initial_params: tuple,
     datafile: str,
     plot: bool = True,
-    verbose: bool = True
+    verbose: bool = True,
 ) -> tuple:
     """
     Minimize the Poisson negative log-likelihood for a given model and data.
@@ -1794,8 +1712,9 @@ def minimize_poisson_ln_likelihood(
         datafile=datafile,
         likelihood_fn_name="poisson_ln_likelihood",
         plot=plot,
-        verbose=verbose
+        verbose=verbose,
     )
+
 
 # =====================================================
 # ======== Main functions for each subquestion ========
@@ -1846,8 +1765,12 @@ def do_question_1b():
             X_MAX,
         )
         bins = 15
-        print("=============================================================================================")
-        print(f"Fitting chi-squared for data file {datafile} with initial parameters a=2.4, b=0.25, c=1.6...")
+        print(
+            "============================================================================================="
+        )
+        print(
+            f"Fitting chi-squared for data file {datafile} with initial parameters a=2.4, b=0.25, c=1.6..."
+        )
         fit_data = build_binned_dataset(radius, nhalo, x_lower, x_upper, bins)
         best_params, min_chi2 = minimize_chi2(
             model=model_bin_means,
@@ -1855,7 +1778,9 @@ def do_question_1b():
             initial_params=(2.4, 0.25, 1.6),
             datafile=datafile,
         )
-        print("=============================================================================================")
+        print(
+            "============================================================================================="
+        )
 
         Nsat_mean = fit_data["Nsat"]
         model_params = {
@@ -1928,8 +1853,12 @@ def do_question_1c():
         )
         bins = 15
 
-        print("=============================================================================================")
-        print(f"Fitting Poisson ln-likelihood for data file {datafile} with initial parameters a=2.4, b=0.25, c=1.6...")
+        print(
+            "============================================================================================="
+        )
+        print(
+            f"Fitting Poisson ln-likelihood for data file {datafile} with initial parameters a=2.4, b=0.25, c=1.6..."
+        )
         fit_data = build_binned_dataset(radius, nhalo, x_lower, x_upper, bins)
         best_params, min_poisson_llh = minimize_poisson_ln_likelihood(
             model=model_bin_means,
@@ -1937,7 +1866,9 @@ def do_question_1c():
             initial_params=(2.4, 0.25, 1.6),
             datafile=datafile,
         )
-        print("=============================================================================================")
+        print(
+            "============================================================================================="
+        )
 
         Nsat_mean = fit_data["Nsat"]
         model_params = {
@@ -2009,8 +1940,12 @@ def do_question_1d():
         bins = 15
 
         # Use best-fit parameters from previous steps
-        best_params_chi2 = get_best_params_for_datafile(datafile, "table_fitparams_chi2.tex")
-        best_params_poisson = get_best_params_for_datafile(datafile, "table_fitparams_poisson.tex")
+        best_params_chi2 = get_best_params_for_datafile(
+            datafile, "table_fitparams_chi2.tex"
+        )
+        best_params_poisson = get_best_params_for_datafile(
+            datafile, "table_fitparams_poisson.tex"
+        )
 
         # Bin data
         fit_data = build_binned_dataset(radius, nhalo, x_lower, x_upper, bins)
@@ -2021,16 +1956,18 @@ def do_question_1d():
 
         # Compute model predictions for the binned data using the best-fit parameters for chi2 and poisson models
         chi2_model_counts = model_bin_means(fit_data["bin_edges"], best_params_chi2)
-        poisson_model_counts = model_bin_means(fit_data["bin_edges"], best_params_poisson)
+        poisson_model_counts = model_bin_means(
+            fit_data["bin_edges"], best_params_poisson
+        )
 
         # Calculate degrees of freedom: number of bins minus number of fitted parameters (a, b, c)
         dof = bins - 3
-        
+
         # Append the G and Q scores for chi2 and poisson fits to their respective arrays
         G_scores_chi2.append(G_test(fit_data["counts"], chi2_model_counts))
-        Q_scores_chi2.append(Q_test(fit_data["counts"], chi2_model_counts, dof=dof))
+        Q_scores_chi2.append(Q_from_G(G_scores_chi2[-1], dof=dof))
         G_scores_poisson.append(G_test(fit_data["counts"], poisson_model_counts))
-        Q_scores_poisson.append(Q_test(fit_data["counts"], poisson_model_counts, dof=dof))
+        Q_scores_poisson.append(Q_from_G(G_scores_poisson[-1], dof=dof))
 
     # Save G and Q scores for chi2 and poisson fits to tex files for later use in the PDF
     with open("Calculations/statistical_test_table_rows.tex", "w") as f:
@@ -2065,7 +2002,9 @@ def do_question_1e():
     num_satellites = len(radius)
 
     # Use best-fit parameters from previous steps for the original data file
-    best_params_chi2 = get_best_params_for_datafile(datafile, "table_fitparams_chi2.tex")
+    best_params_chi2 = get_best_params_for_datafile(
+        datafile, "table_fitparams_chi2.tex"
+    )
     best_params_poisson = get_best_params_for_datafile(
         datafile, "table_fitparams_poisson.tex"
     )
@@ -2123,7 +2062,7 @@ def do_question_1e():
             ),
             datafile=f"mc_chi2_{datafile}_{i}",
             plot=False,
-            verbose=False
+            verbose=False,
         )
         best_poisson_params, _ = minimize_poisson_ln_likelihood(
             model=model_bin_means,
@@ -2135,7 +2074,7 @@ def do_question_1e():
             ),
             datafile=f"mc_poisson_{datafile}_{i}",
             plot=False,
-            verbose=False
+            verbose=False,
         )
 
         pseudo_chi2_params.append(best_chi2_params)
@@ -2251,7 +2190,7 @@ def do_question_1e():
 
 
 if __name__ == "__main__":
-    RNG.set_seed(42) # Set random seed for reproducibility (never reseed)
+    RNG.set_seed(42)  # Set random seed for reproducibility (never reseed)
 
     do_question_1a()
     do_question_1b()
